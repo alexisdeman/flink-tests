@@ -1,0 +1,32 @@
+from kafka import KafkaProducer
+
+import json
+import time
+
+
+producer = KafkaProducer(bootstrap_servers=['localhost:9092'])
+
+users = [
+    {
+        'user_id': 1,
+        'name': 'John Doe'
+    },
+    {
+        'user_id': 2,
+        'name': 'Jane Smith'
+    },
+    {
+        'user_id': 3,
+        'name': 'Kevin Ramsey'
+    },
+    {
+        'user_id': 4,
+        'name': 'Mary Milner'
+    }
+]
+
+for user in users:
+    str_data = json.dumps(user)
+    producer.send(topic='users_join', key=bytes(str(user['user_id']), 'utf-8'),
+                  value=bytes(str_data, 'utf-8'))
+    time.sleep(1)
