@@ -1,62 +1,43 @@
 package com.therealreal.pubsub;
 
-import java.util.Map;
 
-import org.apache.flink.api.common.functions.FlatMapFunction;
+import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
-import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.streaming.connectors.gcp.pubsub.PubSubSource;
-import org.apache.flink.streaming.connectors.gcp.pubsub.common.PubSubSubscriber;
-import org.apache.flink.util.Collector;
 
 
 public class PubSubStreaming {
 
 	public static void main(String[] args) throws Exception {
-		StreamExecutionEnvironment streamEnv = StreamExecutionEnvironment.getExecutionEnvironment();
-		streamEnv.enableCheckpointing(4000);
-		
-		SegmentDeserializer deserializer = new SegmentDeserializer();
-		Map<String, String> envVars = System.getenv();
-		String applicationFile = envVars.get("GOOGLE_APPLICATION_CREDENTIALS");
-		String pubsub_subs = envVars.get("PUBSUB_SUBSCRIPTION");
-		System.out.println(applicationFile);
-		System.out.println(pubsub_subs);
-		String project = "trr-cloudfunctions-test";
-		String subscription = "gunjan_flink_segment2";
-		
-		SourceFunction<PubSubEvent> pubsubSource = PubSubSource.newBuilder()
-				.withDeserializationSchema(deserializer)
-				.withProjectName(project)
-				.withSubscriptionName(subscription)
-				.build();
-		System.out.println(pubsubSource.toString());
-		
-		DataStream<PubSubEvent> stream = streamEnv.addSource(pubsubSource);
-		stream.print();
-		
-		DataStream<Tuple2<String, String>> result = stream.flatMap(new FlatMapFunction<PubSubEvent, Tuple2<String, String>>() {
+		final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+		env.enableCheckpointing(1000L);
 
+		env.addSource(PubSubSource.newBuilder()
+								  .withDeserializationSchema(new SimpleStringSchema())
+								  .withProjectName("trr-cloudfunctions-test")
+								  .withSubscriptionName("gunjan_flink_segment3")
+								  .build())
+        	.map(new MapFunction<String, String>() {
 
-			private static final long serialVersionUID = -8876908366281948639L;
+				private static final long serialVersionUID = 1L;
 
-			@Override
-			public void flatMap(PubSubEvent value, Collector<Tuple2<String, String>> out) throws Exception {
-				Tuple2<String, String> t = new Tuple2<String, String>();
-				System.out.println("mapping");
-				t.f0 = value.type;
-				t.f1 = value.event;
-			}
-			
-		}
-		);
-		
-		result.print();
-		
-		streamEnv.execute("Reading pubsub data");
-		
+				@Override
+				public String map(String value) throws Exception {
+					System.out.println("Payload: " + value);
+					return value;
+				}
+			});
+		// can also use the map function this way through lambda function
+		// .map(PubSubStreaming::printPayload)
+		// .map(s -> PubSubStreaming.printPayload(s))
+
+		env.execute("Flink Streaming PubSubReader");
 	}
+	
+	private static String printPayload(String i) {
+		System.out.println("Payload: " + i);
+		return i;
+	}
+
 }
